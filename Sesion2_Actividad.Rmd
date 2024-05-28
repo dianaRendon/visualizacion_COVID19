@@ -1,0 +1,265 @@
+---
+title: "Sesion2_Actividad"
+output: github_document
+date: "2024-05-28"
+---
+
+## Chunk de carga de paquetes, definición de variables, etc.
+
+Este chunk debería marcarse con echo=FALSE y message=FALSE. ¿Tal vez los demás también? Esto ya dependerá de las preferencias personales de cada quien y el cómo quiere presentar sus resultados.
+
+```{r entorno}
+library(coronavirus)
+library(tidyverse)
+
+casos <- coronavirus::coronavirus
+```
+
+## Antecedentes
+
+Se empieza definiendo un poco de contexto en 3 párrafos:
+
+* ¿Qué es el COVID19? Es un virus, se transmite por vía aerea, causa diversos síntomas, etc...
+
+* ¿Cuál fue la situación en México entre 2020 y 2022? Cuándo se tuvieron los primeros contagios, qué medidas se tomaron, cómo se establecieron los programas de prevención y vacunación, etc...
+
+* ¿Cuál es el contexto de los datos que estamos usando? Se recomienda revisar el github del autor del paquete [https://github.com/RamiKrispin/coronavirus] para acceder a los detalles de los datos. También se puede probar con ??coronavirus en RStudio.
+
+## Materiales y métodos
+
+Se empieza por citar la fuente de los datos:
+
+* Se recomienda revisar el github del autor del paquete [https://github.com/RamiKrispin/coronavirus] para acceder a los detalles de los datos. También se puede probar con ??coronavirus en RStudio.
+
+Escribir un párrafo para definir las ecuaciones usadas para medir el impacto de una enfermedad:
+
+* $TasaDeIncidencia = NuevosCasos / Población \times 100,000$
+
+* $TasaDeMortalidad = Defunciones / Población \times 100,000$
+
+## Resultados
+
+* Nuevos casos confirmados en el tiempo (línea de tiempo sobre casos a nivel mundial).
+
+```{r confimados_mundial}
+casos |> 
+  # filtra tipo de dato que se quiere ver
+  filter(type == "confirmed") |> 
+  # agrupar con dplyr para poder resumir los datos
+  group_by(date) |> 
+  summarise(casos = sum(cases, na.rm = TRUE)) |> 
+  # graficar con ggplot
+  ggplot(aes(x = date, y = casos))+
+  geom_line()+
+  labs(title = "Nuevos casos confirmados a nivel mundial",
+       x = "Fecha",
+       y = "# de nuevos casos")
+```
+
+* Acumulativo de nuevos casos confirmados en el tiempo.
+
+```{r casos_confirmados_acumulado}
+# guardar los datos de nuevos casos
+temp1 <- casos |> 
+  # filtrar tipo de datos que se quieren ver
+  filter(type == "confirmed") |> 
+  # agrupar para resumir
+  group_by(date) |> 
+  summarise(casos = sum(cases, na.rm = TRUE))
+
+# agregar columna de datos acumulativos
+temp1$acumulado = cumsum(temp1$casos)
+
+# graficar
+temp1 |> 
+  ggplot(aes(x = date, y = acumulado))+
+  geom_line()+
+  labs(title = "Acumulativo de nuevos casos confirmados",
+       x = "Fecha",
+       y = "# de nuevos casos")
+
+```
+
+* Defunciones reportadas a nivel mundial.
+
+```{r defunciones_mundial}
+casos |> 
+  # filtra tipo de dato que se quiere ver
+  filter(type == "death") |> 
+  # agrupar con dplyr para poder resumir los datos
+  group_by(date) |> 
+  summarise(casos = sum(cases, na.rm = TRUE)) |> 
+  # graficar con ggplot
+  ggplot(aes(x = date, y = casos))+
+  geom_line()+
+  labs(title = "Defunciones a nivel mundial",
+       x = "Fecha",
+       y = "# de defunciones")
+```
+
+
+* Defunciones acumuladas a nivel mundial
+
+```{r defunciones_acumuladas_mundial}
+temp1 <- casos |> 
+  # filtrar tipo de datos que se quieren ver
+  filter(type == "death") |> 
+  # agrupar para resumir
+  group_by(date) |> 
+  summarise(casos = sum(cases, na.rm = TRUE))
+
+# agregar columna de datos acumulativos
+temp1$acumulado = cumsum(temp1$casos)
+
+# graficar
+temp1 |> 
+  ggplot(aes(x = date, y = acumulado))+
+  geom_line()+
+  labs(title = "Acumulativo de defunciones",
+       x = "Fecha",
+       y = "# de defunciones")
+```
+
+* Casos confirmados y defunciones en México (línea de tiempo sobre casos confirmados en México).
+
+```{r casos_mexico}
+temp_mx <- casos |> 
+  # filtrar tipo de datos que se quieren ver
+  filter(type != "recovery") |> 
+  filter(country == "Mexico") |> 
+  # agrupar para resumir
+  group_by(date, type) |> 
+  summarise(casos = sum(cases, na.rm = TRUE)) |> 
+  pivot_wider(names_from = "type", values_from = "casos")
+
+# agregar columna de datos acumulativos
+
+temp_mx$acumulado_confirmado = cumsum(temp_mx$confirmed)
+temp_mx$acumulado_muerte = cumsum(temp_mx$death)
+
+# graficar
+temp_mx |> 
+  pivot_longer(cols = c(confirmed:acumulado_muerte),
+               names_to = "Variable", values_to = "Cuenta") |> 
+  filter(Variable == "confirmed" | Variable == "death") |> 
+  ggplot(aes(x = date, y = Cuenta, color = Variable))+
+  geom_line()+
+  labs(title = "Casos confirmados y defunciones en México",
+       x = "Fecha",
+       y = "# de casos")
+```
+
+* Casos acumulados en México.
+
+```{r defunciones_mexico}
+# graficar
+temp_mx |> 
+  pivot_longer(cols = c(confirmed:acumulado_muerte),
+               names_to = "Variable", values_to = "Cuenta") |> 
+  filter(Variable == "acumulado_confirmado" | Variable == "acumulado_muerte") |> 
+  ggplot(aes(x = date, y = Cuenta, color = Variable))+
+  geom_line()+
+  labs(title = "Casos confirmados y defunciones en México",
+       x = "Fecha",
+       y = "# de casos")
+```
+
+* Tasa de incidencia a nivel mundial por país, por año.
+  + Presentar la información en un datatable, para facilitar el acceso a los datos.
+
+```{r tasa_incidencia_mundial}
+T_Incidencia <- casos |> 
+  # filtrar tipo de datos 
+  filter(type == "confirmed") |> 
+  # agrupar para después resumir los datos
+  group_by(date, country) |> 
+  summarise(casos = sum(cases, na.rm = TRUE),
+            poblacion = sum(population, na.rm = TRUE)) |> 
+  # agregar columna de año
+  mutate(año = format(date, "%Y")) |> 
+  # deshacer los grupos anteriores para agrupar pero ahora por año
+  ungroup() |> 
+  group_by(año, country) |> 
+  summarise(casos = sum(casos, na.rm = TRUE),
+            poblacion = mean(poblacion, na.rm = TRUE)) |> 
+  # filtrar países con población 0, para evitar NaN e Infinitos
+  filter(poblacion > 0) |> 
+  # calcular tasa de incidencia
+  mutate(tasa_incidencia = casos / poblacion * 100000)
+
+DT::datatable(T_Incidencia)
+```
+
+* Tasa de mortalidad a nivel mundial por país
++ Presentar la información en un datatable, para facilitar el acceso a los datos.
+
+```{r tasa_mortalidad_mundial}
+T_Mortalidad <- casos |> 
+  # filtrar tipo de datos 
+  filter(type == "death") |> 
+  # agrupar para después resumir los datos
+  group_by(date, country) |> 
+  summarise(casos = sum(cases, na.rm = TRUE),
+            poblacion = sum(population, na.rm = TRUE)) |> 
+  # agregar columna de año
+  mutate(año = format(date, "%Y")) |> 
+  # deshacer los grupos anteriores para agrupar pero ahora por año
+  ungroup() |> 
+  group_by(año, country) |> 
+  summarise(casos = sum(casos, na.rm = TRUE),
+            poblacion = mean(poblacion, na.rm = TRUE)) |> 
+  # filtrar países con población 0, para evitar NaN e Infinitos
+  filter(poblacion > 0) |> 
+  # calcular tasa de mortalidad
+  mutate(tasa_mortalidad = casos / poblacion * 100000)
+
+DT::datatable(T_Mortalidad)
+```
+
+* Indicar valores de tasa de incidencia y mortalidad para México
+
+```{r tasa_incidencia_mexico}
+# filtrar información a nivel país
+T_Incidencia |> 
+  filter(country == "Mexico")
+```
+```{r tasa_mortalidad_mexico}
+# filtrar información a nivel país
+T_Mortalidad |> 
+  filter(country == "Mexico")
+```
+
+
+## Conclusiones
+
+* Se pueden escribir un párrafo o dos con respecto a los resultados observados y a la situación del COVID19 a cuatro años de haber iniciado la pandemia.
+
+## Bibliografía
+
+* Se agregan las referencias necesarias para citar los documentos y reportes utilizados.
+* Se debe incluir también la cita al paquete de datos `coronavirus` de R.
+
+# Pasos a seguir para subir el reporte a GitHub
+
+1. Crear el repositorio en la web de GitHub. Se puede sugerir un nombre como "visualizacion_COVID19".
+2. Copiar la URL del repositorio remoto.
+3. Pasar a la terminal en RStudio.
+4. Verificar que el directorio de trabajo coincida con el directorio en donde está el reporte. 
+5. Inicializar el repositorio local `git init`
+6. Añadir el archivo al área de preparación `git add Sesion2_Actividad.md`
+7. Confirmar los cambios `git commit -m "Se carga archivo de reporte"`
+8. Asignar un nombre de rama `git branch -M main`
+9. Conectar los repositorios local y remoto `git remote add origin https://github.com/xxxUsrNmxxx/visualizacion_COVID19.git`
+10. Llevar los cambios locales al repositorio remoto `git push -u origin main`
+
+> [Nota]
+
+> En caso de que RStudio no permita usar el nombre de usuario y contraseña para hacer la conexión remota se puede usar en vez de la contraseña un **Access token**. 
+
+> 1. En la página de GitHub hacer click en el ícono de perfil y luego en "Settings".
+> 2. En el menú del lado izquierdo, hacer click en la última opción "Developer settings".
+> 3. En el menú del lado izquierdo, hacer click en "Personal access tokens" y después en "Fine-grained tokens".
+> 4. Del lado derecho aparece el botón de "Generate new token", hacer click ahí y confirmar con contraseña.
+> 5. Se puede dar un nombre al token "Visualizacion COVID19", cambiar el tiempo de expiración a 90 días y agregar alguna descripción. En la sección de "Repository access" seleccionar la tercera opción "Only select repositories" y escoger el repo adecuado.
+> 6. Otorgar permisos adecuados. Para **Repository permissions** habilitar Actions, Administration, Commit statuses, Contents, Deployments, Environments, Metadata, Pages, Pull requests. Para **Account permissions** habilitar todo.
+> 7. Copiar el token generado y usarlo como contraseña cuándo se hace el push.
